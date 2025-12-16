@@ -29,7 +29,7 @@ YEAR="2025"
 MONTH="December"
 CONFIG = {
     "WIKI_URL": "https://en.wikipedia.org/wiki/Deaths_in_"+YEAR+"#"+MONTH,
-    "CHECK_INTERVAL_SEC": 20, #300, #(5 минут)  # 3600+ (1 час)
+    "CHECK_INTERVAL_SEC": 20, #300, #(5 минут) 3600+ (1 час). для отладки 20 сек между группами по 5
     "DATA_FILE": "seen_deaths.json",
     "EMAIL": {
         "SMTP_SERVER": "smtp.gmail.com",
@@ -39,7 +39,7 @@ CONFIG = {
         "RECIPIENT": os.getenv("EMAIL_RECIPIENT", "recipient@example.com"),
     },
 }
-SEEN = []
+SEEN = [] # список, в котором помещаются просмотренные записи для отсутствия дублирования
 
 
 def get_wikipedia_page(url: str) -> Optional[str]:
@@ -54,6 +54,7 @@ def get_wikipedia_page(url: str) -> Optional[str]:
         return None
 
 def get_first_paragraph_clean(url: str) -> str:
+    """ Процедура поиска первого абзаца информации о человеке """
     # Получаем HTML
     headers = {"User-Agent": "WikiMonitor/1.0 (contact@example.com)"}
     html = requests.get(url, headers=headers).text
@@ -82,6 +83,8 @@ def get_first_paragraph_clean(url: str) -> str:
     return text
 
 def another_first(page):
+    """ Если первая процедура не выдала результат,
+    то используется эта процедура получения первого абзаца """
     resp = requests.get(
         f"https://en.wikipedia.org/api/rest_v1/page/summary/{page}",
         headers={"User-Agent": "WikiMonitor/1.0 (contact@example.com)"}
@@ -89,6 +92,7 @@ def another_first(page):
     return resp["extract"]
 
 def extract_deaths_from_list(str):
+    """ Поиск умерших с помощью Selenium """
     # Настройка Chrome в headless-режиме (тихо, без окна)
     options = Options()
     options.add_argument("--headless=new")  # современный headless
@@ -123,9 +127,6 @@ def extract_deaths_from_list(str):
                 text = li.text.strip()
                 if text and len(text) > 10:  # фильтр пустых
                     text_lst = li.text.split(',')
-                    # hm -= 1
-                    # if hm < 0: break
-
                     parts = text.split(",", 2)
                     name = parts[0].strip() if len(parts) > 0 else "?"
                     age = parts[1].strip() if len(parts) > 1 else "?"
@@ -151,6 +152,7 @@ def extract_deaths_from_list(str):
 
 
 def get_russian_url_from_html(en_url: str) -> str | None:
+    """ Процедура поиска информации о человеке в Wikipedia на русском языке """
     try:
         html = requests.get(en_url, headers={"User-Agent": "WikiMonitor/1.0"}).text
         soup = BeautifulSoup(html, "html.parser")
@@ -159,10 +161,11 @@ def get_russian_url_from_html(en_url: str) -> str | None:
     except:
         return en_url
 def send_email(subject, body):
-    # print("Письмо успешно отправлено! ")
+    """ Процедура отправки письма на основании информации из .env"""
+
     print(f"{subject=}")
     print(f"{body=}")
-    # return
+    # return # для отладки
     msg = MIMEMultipart()
 
     sender = CONFIG["EMAIL"]["SENDER"] #sender
@@ -231,7 +234,6 @@ def main():
 """
 
                 send_email(subject, body)
-            # time.sleep(CONFIG["CHECK_INTERVAL_SEC"])
         except KeyboardInterrupt:
             break
         except Exception as e:
